@@ -3,7 +3,7 @@ SpX
 
 OG2 Launch code
 
-To run: "make 1" for default, or "make 2" for coriolis
+To run: "make 1" for Stage 1 launch/re-entry/landing, or "make 2" for Stage 2 launch/orbit
 
 default.c and default.h are simulated from the reference frame of an observer standing on the Earth - i.e they do NOT take into account the Coriolis effect. This is handy for any boost stage trajectories.
 
