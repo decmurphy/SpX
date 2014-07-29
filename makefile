@@ -2,7 +2,7 @@ TARGET = earth stage1 stage2
 TEST = earth_run stage1_run stage2_run
 CC = mpicc
 LIBS = -lm
-CFLAGS = -O3 -g -W -Wall -pedantic
+CFLAGS = -O3 -g
 
 default: 2
 1: clean stage1 earth stage1_run earth_run
@@ -11,8 +11,8 @@ all: $(TARGET) $(TEST)
 
 ###########################################################
 
-%.o: %.c $(DEPS)
-	@gcc $(CFLAGS) -o $@ $< -c
+#%.o: %.c $(DEPS)
+#	@gcc $(CFLAGS) -o $@ $< -c
 
 earth: earth.c
 	@gcc $(CFLAGS) $< -o $@ $(LIBS)
