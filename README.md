@@ -11,7 +11,7 @@ For second stage trajectories (like trying to achieve orbit), orbit.c gives the 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-The only thing I want to improve is smoother rotations. As it stands, the pitch-kick is a sudden chage in angle, as are all the course corrections (of which OG2 second stage has a lot - gravity couldn't turn it fast enough). 
+The only thing I want to improve is smoother rotations. As it stands, the pitch-kick is a sudden change in angle, as are all the course corrections (of which OG2 second stage has a lot - gravity couldn't turn it fast enough). 
 
 Also I'll translate this to C++ at some point in time. Object-oriented programming would be much smoother for this kind of project.
 
