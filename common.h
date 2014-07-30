@@ -21,9 +21,22 @@ typedef struct {
 
 } Engine;
 
+typedef struct {
+
+	double t;
+	char name[128];
+
+} Event;
+
 extern Rocket F9;
 extern Engine M1D;
 extern Engine M1Dv;
+
+extern int 	_pitch,
+		_ME1, _ME2, _ME3,
+		_MECO1, _MECO2, _MECO3,
+		_LBURN, _BBURN,
+		_SE1, _SECO1;
 
 int engines;
 double S, V, VA, VR, A, M;		// Distance, Velocity, Absolute V, Relative V, Acceleration, Mass
@@ -83,27 +96,16 @@ inline void ignition(int stage, int *x, int num_engs)
 
 }
 
-inline first_step_coriolis()
-{
-	M = F9.Mr[0] + F9.Mr[1] + F9.Mf[0] + F9.Mf[1] + F9.Mp;
-
-	vA[0] = vE;				// Absolute velocity in x-direction = velocity of earth at surface
-
-	F[1] = 9*M1D.Th_sl - M*g0;
-	a[1] = F[1]/M;
-	vA[1] += a[1]*dt/2;
-
-	S = sqrt(s[0]*s[0] + s[1]*s[1]);
-	A = sqrt(a[0]*a[0] + a[1]*a[1]);
-}
-
-inline first_step_no_coriolis()
+inline first_step(int coriolis)
 {
 	M = F9.Mr[0] + F9.Mr[1] + F9.Mf[0] + F9.Mf[1] + F9.Mp;
 
 	F[1] = 9*M1D.Th_sl - M*g0;
 	a[1] = F[1]/M;
-	v[1] += a[1]*dt/2;
+
+	if(coriolis) 	vA[0] = vE;				// Absolute velocity in x-direction = velocity of earth at surface
+	if(coriolis) 	vA[1] += a[1]*dt/2;
+	else		v[1] += a[1]*dt/2;
 
 	S = sqrt(s[0]*s[0] + s[1]*s[1]);
 	A = sqrt(a[0]*a[0] + a[1]*a[1]);
@@ -425,6 +427,67 @@ inline void reset_variables(int *x, int *y, int*z)
 	*x = 0;
 	*y = 0;
 	*z = 0;
+}
+
+void execute(char *name, int stage, FILE *f, int coriolis)
+{
+	if(stage==1) {
+		if(!strcmp(name, "ME1")) {
+			ignition(1, &_ME1, 9);
+			first_step(coriolis);
+			output_telemetry(name, NULL, coriolis);
+		}
+		else if(!strcmp(name, "Pitch_Kick")) {
+			pitch_kick(&_pitch);
+			output_telemetry(name, NULL, coriolis);
+		}
+		else if(!strcmp(name, "MECO1")) {
+			MSECO(&_MECO1);
+			output_telemetry(name, f, coriolis);
+		}
+		else if(!strcmp(name, "Stage_Sep")) {
+			stage_sep(stage);
+			output_telemetry(name, NULL, coriolis);
+		}
+		else if(!strcmp(name, "ME2")) {
+			ignition(1, &_ME2, 3);
+			_BBURN = 1;
+			output_telemetry(name, f, coriolis);
+		}
+		else if(!strcmp(name, "MECO2")) {
+			MSECO(&_MECO2);
+			_BBURN = 0;
+			output_telemetry(name, f, coriolis);
+		}
+		else if(!strcmp(name, "ME3")) {
+			ignition(1, &_ME3, 1);
+			_LBURN = 1;
+			output_telemetry(name, f, coriolis);
+		}
+	}
+	else if(stage==2) {
+		if(!strcmp(name, "ME1")) {
+			ignition(1, &_ME1, 9);
+			first_step(coriolis);
+		}
+		else if(!strcmp(name, "Pitch_Kick")) {
+			pitch_kick(&_pitch);
+		}
+		else if(!strcmp(name, "MECO1")) {
+			MSECO(&_MECO1);
+		}
+		else if(!strcmp(name, "Stage_Sep")) {
+			stage_sep(stage);
+		}
+		else if(!strcmp(name, "SE1")) {
+			ignition(2, &_SE1, 1);
+			output_telemetry(name, NULL, coriolis);
+		}
+		else if(!strcmp(name, "SECO1")) {
+			MSECO(&_SECO1);
+			output_telemetry(name, f, coriolis);
+		}
+	}
 }
 
 #endif
