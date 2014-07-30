@@ -404,5 +404,28 @@ double mod(double a, double b)
 	return a < b ? a : mod(a-b, b);
 }
 
+inline void reset_variables(int *x, int *y, int*z)
+{
+
+	t = 0.0;
+	dt = 0.001;
+
+	s[0] = 0;
+	s[1] = Re;
+	v[0] = 0;
+	v[1] = 0;
+
+	alpha = 0;
+	beta = M_PI/2;
+	gam = M_PI/2;
+
+	F9.Mf[0] = 390000;
+	F9.Mf[1] = 72700;
+
+	*x = 0;
+	*y = 0;
+	*z = 0;
+}
+
 #endif
 

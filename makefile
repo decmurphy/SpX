@@ -13,7 +13,7 @@ all: $(TARGET) $(TEST)
 ###########################################################
 
 %.o: %.c $(DEPS)
-	@mpicc $(CFLAGS) -o $@ $< -c
+	@$(CC) $(CFLAGS) -o $@ $< -c
 
 earth: earth.c
 	@$(CC) $(CFLAGS) $< -o $@ $(LIBS)
@@ -22,10 +22,10 @@ earth_run:
 	@./earth
 
 stage1: return.o
-	@mpicc $(CFLAGS) $< -o $@ $(LIBS)
+	@$(CC) $(CFLAGS) $< -o $@ $(LIBS)
 
 stage1_run:
-	@mpirun -np 2 ./stage1
+	@./stage1
 
 stage2: orbit.o
 	@$(CC) $(CFLAGS) $< -o $@ $(LIBS)
