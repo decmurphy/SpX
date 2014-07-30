@@ -8,8 +8,6 @@ Rocket F9	= {0.3, 10.52, {20000, 4900}, {390000, 75700}, 1200};
 Engine M1D	= {282, 311, 650000, 720000};
 Engine M1Dv	= {0, 345, 0, 801000};
 
-double dt = 0.001;
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char *argv[]) {
@@ -46,16 +44,14 @@ int main(int argc, char *argv[]) {
 		if(t==0) {
 			ignition(1, &_ME1, 9);
 			first_step_coriolis();
-			if(!rank) printf("T+%.2f\t\tLiftoff\n", t);
+			if(!rank) output_telemetry("Liftoff", NULL, 1);
 		}
 		else if(fabs(t-7)<dt/2 && !_pitch) {
-			if(!rank) printf("T+%.2f\t\tPitch Kick\n", t);
+			if(!rank) output_telemetry("Pitch Kick", NULL, 1);
 			pitch_kick(&_pitch);
 		}
 		else if(F9.Mf[0]<45000 && !_MECO1) {
-			if(!rank) printf("T+%.2f\tMECO 1\t\t\t\t%.fkm x %.fkm @ Velocity %.1fkm/s\n",
-				t, (s[0]-vE*t)*1e-3, (S-Re)*1e-3, VR*1e-3);
-			fprintf(f1, "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, VR, A, M, "MECO");
+			if(!rank) output_telemetry("MECO", f1, 1);
 			MSECO(&_MECO1);
 			MECO_t = t;
 		}
@@ -87,17 +83,15 @@ int main(int argc, char *argv[]) {
 		else {
 			if(fabs(t - MECO_t - 2) < dt/2) {
 				MPI_Barrier(MPI_COMM_WORLD);
-				printf("T+%.2f\tFirst Stage Separation\n", t);
+				output_telemetry("Stage Sep", NULL, 1);
 				stage_sep(rank+1);
 			}
 			else if(fabs(t - MECO_t - 4) < dt/2) {
-				printf("T+%.2f\tSecond Engine Start\n", t);
+				output_telemetry("M1Dv Ignition", NULL, 1);
 				ignition(2, &_SE1, 1);
 			}
-			else if((F9.Mf[1]<10 || VA > sqrt(G*Me/S) || mod(360+(alpha-beta+M_PI/2)*180/M_PI, 360) < 0.01) && _SE1 && !_SECO1) {
-				printf("T+%.2f\tSECO 1\t\t\t\t%.2fkm x %.2fkm @ %.2fkm/s, %.2f deg --- (Fuel %.2fkg)\n", 
-					t, (s[0]-vE*t)*1e-3, (S-Re)*1e-3, VA*1e-3, mod(360+(alpha-beta+M_PI/2)*180/M_PI, 360), F9.Mf[1]);
-				fprintf(f1, "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, VR, A, M, "SECO");
+			else if((F9.Mf[1]<10 || VA > sqrt(G*Me/S)/* || mod(360+(alpha-beta+M_PI/2)*180/M_PI, 360) < 0.01*/) && _SE1 && !_SECO1) {
+				output_telemetry("SECO", f1, 1);
 				MSECO(&_SECO1);
 				apo = S-Re;
 				peri = S-Re;
@@ -138,8 +132,8 @@ int main(int argc, char *argv[]) {
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	if(rank && crash) printf("\nT+%.2f\tCrash\t\t\t\t%.2fkm x %.2fkm\n", t, peri*1e-3, apo*1e-3);
-	else if(rank) printf("\nT+%.2f\tOrbit\t\t\t\t%.2fkm x %.2fkm\n", t, peri*1e-3, apo*1e-3);
+	if(rank && crash) printf("\nT+%.0f\t\t\tCrash\t\t%.2fkm x %.2fkm\n", t, peri*1e-3, apo*1e-3);
+	else if(rank) printf("\nT+%.0f\t\t\tOrbit\t\t%.2fkm x %.2fkm\n", t, peri*1e-3, apo*1e-3);
 
 	fclose(f);
 	fclose(f1);

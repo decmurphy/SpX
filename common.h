@@ -2,10 +2,10 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
-#define G 6.67384e-11
-#define Me 5.97219e24
-#define Re 6378137
-#define g0 9.7976
+#define G 6.67384e-11		// Gravitational Const
+#define Me 5.97219e24		// Mass of Earth
+#define Re 6378137		// Radius of Earth
+#define g0 9.7976		// Gravity acceleration on surface
 
 typedef struct {
 
@@ -26,10 +26,11 @@ extern Engine M1D;
 extern Engine M1Dv;
 
 int engines;
-double S, V, VA, VR, A, M;
-double p, q, Ft, Fd, *Fuel;
-double dm, t = 0.0;
-extern double dt;
+double S, V, VA, VR, A, M;		// Distance, Velocity, Absolute V, Relative V, Acceleration, Mass
+double p, q, Ft, Fd, *Fuel;		// throttle, areo pressure, thrust, drag, fuel pointer (to 1st or 2nd stage)
+double dm, t = 0.0;			// rate of fuel consumption, time
+double dt = 0.001;			// time step
+
 				// inclination (rads) = 28.49*M_PI/180;
 double vE = 407.6614278; 	// Earth velocity at Cape Canveral = 2*M_PI*Re*cos(incl)/(24*60*60);
 
@@ -43,6 +44,33 @@ double vR[2] = {0, 0};		// x,y relative velocity (rel. to Earth)
 double alpha = 0, beta = M_PI/2, gam = M_PI/2;	// alpha = angle of velocity, beta = gravity, gamma = thrust
 
 /////////////////////////////////////////////////
+
+inline void output_telemetry(char* event, FILE *f2, int coriolis)
+{
+
+	double temp_s0 = s[0], temp_S = S-Re, temp_V = V;
+	char *dist = "m", *vel = "m/s";
+
+	if(coriolis) {
+		temp_s0 -= vE*t;
+		temp_V = VR;
+	}
+
+	if(temp_s0 > 1e3 || temp_S > 1e3) {
+		temp_s0 *= 1e-3;
+		temp_S *= 1e-3;
+		dist = "km";
+	}
+
+	if(f2) fprintf(f2, "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, temp_V, A/g0, M, event);
+
+	if(temp_V > 1e3) {
+		temp_V *= 1e-3;
+		vel = "km/s";
+	}
+
+	printf("T+%06.2f\t%16.16s\t%.2f%s x %.2f%s @ %.2f%s\n", t, event, temp_s0, dist, temp_S, dist, temp_V, vel);
+}
 
 inline void ignition(int stage, int *x, int num_engs)
 {
