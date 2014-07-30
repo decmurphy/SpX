@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
 				crash = 1;
 				break;
 			}
-
+ 
 			if(_SECO1) {
 				if(S-Re > apo) apo = S-Re;
 				if(S-Re < peri) peri = S-Re;
