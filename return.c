@@ -2,33 +2,13 @@
 #include<stdlib.h>
 #include<math.h>
 #include<mpi.h>
-#include"default.h"
-
-inline void ME_ignition();
-inline void pitch_kick();
-inline void MECO();
-inline void stage_sep();
-inline void SE_ignition();
-inline void SECO();
-void leapfrog_step();
-void angles();
-void grav_turn();
-double mod(double a, double b);
-
-inline double g(double h);
+#include"return.h"
 
 Rocket F9	= {0.3, 10.52, {20000, 4900}, {390000, 72700}, 1200};
 Engine M1D	= {282, 311, 650000, 720000};
 Engine M1Dv	= {0, 345, 0, 801000};
 
-int 	_pitch = 0,
-	_ME1 = 0, _ME2 = 0, _ME3 = 0, _ME4 = 0,
-	_MECO1 = 0, _MECO2 = 0, _MECO3 = 0, _MECO4 = 0,
-	_LBURN = 0, _BBURN = 0,
-	_SE1 = 0, _SECO = 0,
-	_p = 0;
-
-double dt = 0.001, p = 1.0;
+double dt = 0.001;
 int crash = 0;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,12 +21,17 @@ int main(int argc, char *argv[]) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-	double MECO_t = -100, RETRO_t = -100;
+	double MECO_t = -100;
+	int engines;
+	int 	_pitch = 0,
+		_ME1 = 0, _ME2 = 0, _ME3 = 0, _ME4 = 0,
+		_MECO1 = 0, _MECO2 = 0, _MECO3 = 0, _MECO4 = 0,
+		_LBURN = 0, _BBURN = 0,
+		_SE1 = 0, _SECO1 = 0;
 
-	FILE *f, *f1, *f2;
+	FILE *f, *f2;
 	if(!rank) {
-		f = fopen("Stage1_launch.dat", "w");
-		f1 = fopen("Stage1_retro.dat", "w");
+		f = fopen("Stage1.dat", "w");
 		f2 = fopen("Stage1_Points.dat", "w");
 	}
 	else {
@@ -60,25 +45,26 @@ int main(int argc, char *argv[]) {
 
 	do{
 		if(t==0) {
-			ME_ignition(1);
+			ignition(1, &_ME1, 9);
 			first_step();
 			if(!rank) printf("T+%.2f\t\tLiftoff\n", t);
 		}
 		else if(fabs(t-7)<dt/2 && !_pitch) {
 			if(!rank) printf("T+%.2f\t\tPitch Kick\n", t);
-			pitch_kick();
+			pitch_kick(&_pitch);
 		}
 		else if(F9.Mf[0]<45000 && !_MECO1) {
 			if(!rank) {
 				printf("T+%.2f\tMECO 1\t\t\t\t%.fkm x %.fkm @ Velocity %.1fkm/s\n", t, (s[0])*1e-3, (S-Re)*1e-3, V*1e-3);
 				fprintf(f2, "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, V, A/g0, M, "MECO");
 			}
-			MECO(1);
+			MSECO(&_MECO1);
 			MECO_t = t;
 		}
 		else if(fabs(t - MECO_t - 2) < dt/2) {
-			if(!rank) printf("T+%.2f\tFirst Stage Separation\n", t);
+			if(!rank) printf("T+%.2f\tStage Separation\n", t);
 			stage_sep(rank+1);
+			MPI_Barrier(MPI_COMM_WORLD);
 		}
 
 /*************************************************************************************************/
@@ -90,26 +76,26 @@ int main(int argc, char *argv[]) {
 				printf("\nT+%.2f\tBraking Burn Start.\t\t%.2fkm x %.2fkm @ %.2fm/s\n", t, (s[0])*1e-3, (S-Re)*1e-3, V);
 				fprintf(f2, "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, V, A/g0, M, "EB");
 				flip(2);
-				ME_ignition(4);
+				ignition(1, &_ME4, 3);
 				_BBURN = 1;
 			}
 			else if((t>552 && !_MECO4) || F9.Mf[0]<0) {
 				printf("T+%.2f\tBraking Burn End.\t\t%.2fkm x %.2fkm @ %.2fm/s\n", t, (s[0])*1e-3, (S-Re)*1e-3, V);
 				fprintf(f2, "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, V, A/g0, M, "EBX");
-				MECO(4);
+				MSECO(&_MECO4);
 			}				
 			else if(t>628 && _MECO4 && !_ME3 && F9.Mf[0]>0) {
 				printf("T+%.2f\tLanding Burn Start.\t\t%.2fkm x %.2fkm @ %.2fm/s\n", t, (s[0])*1e-3, (S-Re)*1e-3, V);
 				fprintf(f2, "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, V, A/g0, M, "LB");
 				flip(2);
-				ME_ignition(3);
+				ignition(1, &_ME3, 1);
 				_LBURN = 1;
 			}
 			else if((F9.Mf[0] < 5 || (_LBURN && S-Re < 0.1)) && !_MECO3) {
 				printf("T+%.2f\tLanding Burn End.\t\t%.2fkm x %04.2fkm @ %04.2fm/s --- (Fuel %.2fkg)\n",
 					t, (s[0])*1e-3, (S-Re)*1e-3, V, F9.Mf[0]);
 				fprintf(f2, "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, V, A/g0, M, "LBX");
-				MECO(3);
+				MSECO(&_MECO3);
 			}
 			else if(S<Re) {
 				printf("\n\t///////////////////////////////////////////////////////////////////////////////////\n");
@@ -119,15 +105,16 @@ int main(int argc, char *argv[]) {
 				break;
 			}
 
-			leapfrog_step(1);
+			leapfrog_step(1, _MECO1);
 			angles();
-			if(t > 55 && !_MECO1) 	grav_turn();
-			if(_BBURN || _LBURN)	flip(2);
+			if(t > 55 && !_MECO1)
+				grav_turn(_MECO1, _SECO1);
+			if(_BBURN || _LBURN)
+				flip(2);
+			if(_LBURN && mod(t, 5) < dt)
+				update_landing_throttle();
 
-			if(!_MECO1)
-				fprintf(f , "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, V, A/g0, M, q);
-			else
-				fprintf(f1, "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, V, A/g0, M, q);
+			fprintf(f , "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, V, A/g0, M, q);
 
 		}
 
@@ -139,32 +126,30 @@ int main(int argc, char *argv[]) {
 		else {
 			if(fabs(t - MECO_t - 4) < dt/2) {
 				printf("T+%.2f\tSecond Engine Start\n", t);
-				SE_ignition();
+				ignition(2, &_SE1, 1);
 			}
-			else if((F9.Mf[1]<10 || V > 7800) && !_SECO) {
-				printf("T+%.2f\tSECO 1\t\t\t\t%.2fkm x %.2fkm @ %.2fkm/s, %.2f deg --- (Fuel %.2fkg)\n", 
-					t, (s[0])*1e-3, (S-Re)*1e-3, V*1e-3, (alpha-beta+M_PI/2)*180/M_PI, F9.Mf[1]);
+			else if((F9.Mf[1]<10 || V > 7800) && !_SECO1) {
+				printf("T+%.2f\tSECO 1\n", t);
 				fprintf(f2, "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%s\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, V, A/g0, M, "SECO");
-				SECO();
+				MSECO(&_SECO1);
 				break;
 			}
 
-			leapfrog_step(2);
+			leapfrog_step(2, _MECO1);
 			angles();
-			if(t > 55) grav_turn();
+			if(t > 55)
+				grav_turn(_MECO1, _SECO1);
 
 			fprintf(f, "%g\t%f\t%f\t%f\t%f\t%f\t%f\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, V, A/g0, M);
 
 /*************************************************************************************************/
 
 		}
-
 	}
 	while(1);
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	if(!rank) fclose(f1);
 	fclose(f);
 	fclose(f2);
 

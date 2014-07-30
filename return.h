@@ -25,16 +25,12 @@ typedef struct {
 extern Rocket F9;
 extern Engine M1D;
 extern Engine M1Dv;
-extern int _pitch, 
-	_ME1, _ME2, _ME3, _ME4,
-	_MECO1, _MECO2, _MECO3, _MECO4,
-	_SE1, _SECO,
-	_p;
 
+int engines;
 double S, V, A, M;
-double q, Ft, Fd, *Fuel;
+double p, q, Ft, Fd, *Fuel;
 double dm, t = 0.0;
-extern double dt, p;
+extern double dt;
 
 double F[2] = {0, 0};
 double s[2] = {0, Re};
@@ -45,14 +41,16 @@ double alpha = 0, beta = M_PI/2, gam = M_PI/2;
 
 /////////////////////////////////////////////////
 
-inline void ME_ignition(int x)
+inline void ignition(int stage, int *x, int num_eng)
 {
 	p = 1;
-	Fuel = &(F9.Mf[0]);
-	if(x==1) _ME1 = 1;
-	if(x==2) _ME2 = 1;
-	if(x==3) _ME3 = 1;
-	if(x==4) _ME4 = 1;
+	engines = num_eng;
+
+	*x = 1;
+	Fuel = 	(stage==1) ? &(F9.Mf[0]) :
+		(stage==2) ? &(F9.Mf[1]) :
+		0;
+
 }
 
 inline first_step()
@@ -67,48 +65,31 @@ inline first_step()
 	A = sqrt(a[0]*a[0] + a[1]*a[1]);
 }
 
-inline void pitch_kick()
+inline void pitch_kick(int *x)
 {
 	gam = M_PI/2 - 0.025;
-	_pitch = 1;
+	*x = 1;
 }
 
-inline void MECO(int x)
+inline void MSECO(int *x)
 {
 	p = 0;
-	if(x==1) 	_MECO1 = 1;
-	else if(x==2) 	_MECO2 = 1;
-	else if(x==3) 	_MECO3 = 1;
-	else if(x==4) 	_MECO4 = 1;
+	engines = 0;
+	*x = 1;
 }
 
-inline void stage_sep(int stage_follow)
+inline void stage_sep(int x)
 {
-
-	if(stage_follow == 1)
-		M -= (F9.Mr[1] + F9.Mf[1] + F9.Mp);
-	else if(stage_follow == 2)
-		M -= (F9.Mr[0] + F9.Mf[0]);
+	M -= 	(x==1) ? (F9.Mr[1] + F9.Mf[1] + F9.Mp) :
+		(x==2) ? (F9.Mr[0] + F9.Mf[0]) :
+		0;
 }
 
-inline void flip(int x) {
-
-	if(x==1)	gam = beta + M_PI/2;
-	else if(x==2)	gam = alpha + M_PI;
-
-}
-
-inline void SE_ignition()
+inline void flip(int x)
 {
-	p = 1;
-	Fuel = &(F9.Mf[1]);
-	_SE1 = 1;
-}
-
-inline void SECO()
-{
-	p = 0;
-	_SECO = 1;
+	gam = 	(x==1) ? beta + M_PI/2 :
+		(x==2) ? alpha + M_PI :
+		0;
 }
 
 /////////////////////////////////////////////////
@@ -135,38 +116,23 @@ inline double P(double h)
 
 inline double Isp(double h)
 {
-	if(h<80000)
-		return M1D.Isp_sl + (1.0/P(0))*(P(0)-P(h*1e-3))*(M1D.Isp_vac - M1D.Isp_sl);
-	else
-		return M1D.Isp_vac;
+	return 	(h<80000) ? M1D.Isp_sl + (1.0/P(0))*(P(0)-P(h*1e-3))*(M1D.Isp_vac - M1D.Isp_sl) :
+		M1D.Isp_vac;
 }
 
-inline double GetThrust(double H, int stage)
+inline double GetThrust(double H, int stage, int sync)
 {
-	if(stage==1 || !_MECO1)
+	if(stage==1 || !sync)
 		return Isp(H-Re)*236*g0;
 	else if(stage==2)
 		return M1Dv.Th_vac;
 }
 
-void leapfrog_step(int stage)
+void leapfrog_step(int stage, int sync)
 {
-	double num_engines;
 
-	if(stage==2 && _SE1) {
-		if(!_SECO)		 num_engines = 1;
-		else			 num_engines = 0;
-	}
-	else {
-		if(_ME1 && !_MECO1)	 num_engines = 9;	// Launch
-		else if(_ME2 && !_MECO2) num_engines = 3;	// Retro Burn
-		else if(_ME4 && !_MECO4) num_engines = 3;	// Braking Burn
-		else if(_ME3 && !_MECO3) num_engines = 1;	// Landing Burn
-		else			 num_engines = 0;
-	}
-
-	Ft = num_engines*p*GetThrust(S, stage);
-	dm = num_engines*p*236*dt;
+	Ft = engines*p*GetThrust(S, stage, sync);
+	dm = engines*p*236*dt;
 	*Fuel -= dm;
 	M -= dm;
 
@@ -200,7 +166,7 @@ double throttle_test(double hy, double ux, double uy, double mf, double throttle
 
 	VEL = sqrt(ux*ux + uy*uy);
 
-	ft = throttle*GetThrust(hy, 1);
+	ft = throttle*GetThrust(hy, 1, 1);
 
 	do
 	{
@@ -254,6 +220,11 @@ inline double get_landing_throttle(double H, double ux, double uy, double mf)
 
 }
 
+inline void update_landing_throttle()
+{
+	p = get_landing_throttle(S, v[0], v[1], F9.Mf[0]);
+}
+
 inline void angles()
 {
 	beta = acos(s[0]/S);
@@ -263,20 +234,12 @@ inline void angles()
 	alpha = acos(v[0]/V);
 	if(v[1]<0)
 		alpha = 2*M_PI - alpha;
-
-	if(mod(t, 5) < dt)
-		_p = 0;
-
-	if(_ME3 && !_p) {
-		p = get_landing_throttle(S, v[0], v[1], F9.Mf[0]);
-		_p = 1;
-	}
 }
 
-inline void grav_turn()
+inline void grav_turn(int _M1, int _S1)
 {
 	gam = alpha;
-	if(_MECO1 && V*cos(beta-alpha)<0 && !_SECO)
+	if(_M1 && V*cos(beta-alpha)<0 && !_S1)
 		gam = asin(-M*g(S)*sin(beta+M_PI)/Ft);
 
 	if(V > 2900)
