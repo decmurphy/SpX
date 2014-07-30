@@ -65,14 +65,14 @@ int main(int argc, char *argv[]) {
 			peri = S-Re;
 			dt = 0.1;
 		}
-			if(_SECO1 && S-Re < 1e5) {
-			crash = 1;
-			break;
-		}
- 
+
 		if(_SECO1) {
-			if(S-Re > apo) apo = S-Re;
+			if(S-Re > apo)	apo = S-Re;
 			if(S-Re < peri) peri = S-Re;
+			if(S-Re < 1e5) {
+				crash = 1;
+				break;
+			}
 		}
 
 		leapfrog_step_coriolis(2, _MECO1);
