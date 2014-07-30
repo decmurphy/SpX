@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
 				output_telemetry("M1Dv Ignition", NULL, 1);
 				ignition(2, &_SE1, 1);
 			}
-			else if((F9.Mf[1]<10 || VA > sqrt(G*Me/S)/* || mod(360+(alpha-beta+M_PI/2)*180/M_PI, 360) < 0.01*/) && _SE1 && !_SECO1) {
+			else if((F9.Mf[1]<10 || VA > sqrt(G*Me/S)) && _SE1 && !_SECO1) {
 				output_telemetry("SECO", f1, 1);
 				MSECO(&_SECO1);
 				apo = S-Re;
