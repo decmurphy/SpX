@@ -3,7 +3,7 @@ TEST = earth_run stage1_run stage2_run
 CC = mpicc
 LIBS = -lm
 CFLAGS = -O3 -g
-DEPS = return.h orbit.h
+DEPS = common.h
 
 default: 1
 1: stage1 earth earth_run stage1_run
