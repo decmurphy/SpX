@@ -2,7 +2,7 @@
 #include<stdlib.h>
 #include<math.h>
 #include<mpi.h>
-#include"return.h"
+#include"common.h"
 
 Rocket F9	= {0.3, 10.52, {20000, 4900}, {390000, 72700}, 1200};
 Engine M1D	= {282, 311, 650000, 720000};
@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
 	do{
 		if(t==0) {
 			ignition(1, &_ME1, 9);
-			first_step();
+			first_step_no_coriolis();
 			if(!rank) printf("T+%.2f\t\tLiftoff\n", t);
 		}
 		else if(fabs(t-7)<dt/2 && !_pitch) {
@@ -105,10 +105,10 @@ int main(int argc, char *argv[]) {
 				break;
 			}
 
-			leapfrog_step(1, _MECO1);
-			angles();
+			leapfrog_step_no_coriolis(1, _MECO1);
+			angles_no_coriolis();
 			if(t > 55 && !_MECO1)
-				grav_turn(_MECO1, _SECO1);
+				grav_turn_no_coriolis(_MECO1, _SECO1);
 			if(_BBURN || _LBURN)
 				flip(2);
 			if(_LBURN && mod(t, 5) < dt)
@@ -135,10 +135,10 @@ int main(int argc, char *argv[]) {
 				break;
 			}
 
-			leapfrog_step(2, _MECO1);
-			angles();
+			leapfrog_step_no_coriolis(2, _MECO1);
+			angles_no_coriolis();
 			if(t > 55)
-				grav_turn(_MECO1, _SECO1);
+				grav_turn_no_coriolis(_MECO1, _SECO1);
 
 			fprintf(f, "%g\t%f\t%f\t%f\t%f\t%f\t%f\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, V, A/g0, M);
 
