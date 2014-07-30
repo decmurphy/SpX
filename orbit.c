@@ -100,6 +100,8 @@ int main(int argc, char *argv[]) {
 	if(crash) printf("\nT+%.0f\t\t\tCrash\t\t%.2fkm x %.2fkm\n", t, peri*1e-3, apo*1e-3);
 	else printf("\nT+%.0f\t\t\tOrbit\t\t%.2fkm x %.2fkm\n", t, peri*1e-3, apo*1e-3);
 
+	free(event);
+
 	fclose(f);
 	fclose(f1);
 	fclose(f2);

@@ -114,6 +114,8 @@ int main(int argc, char *argv[]) {
 	while(1);
 	printf("\n");
 
+	free(event);
+
 	fclose(f);
 	fclose(f1);
 	fclose(f2);
