@@ -71,10 +71,13 @@ inline void init(Event **event, int *N, int argc, char **argv)
 	int opt, line = -1;
 	char str[128], inputfile[128];
 
+	strncpy(inputfile, "profile.txt", sizeof(inputfile));	// Default flight profile
+
 	while( (opt=getopt(argc,argv,"f:s:")) != -1) {
 		switch(opt) {
 			case 'f': strncpy(inputfile, optarg, sizeof(inputfile)); break;
-			case 's': vE = atoi(optarg)==0 ? 0 : 407.6614278; break; 	// Earth velocity at Cape Canveral
+			case 's': vE = atoi(optarg)==0 ? 0 : 407.6614278; break; 		// Earth velocity at Cape Canveral
+			case '?': printf("Usage: %s -s [stage] -f [flight-profile]\n", argv[0]); exit(1);
 		}
 	}
 
