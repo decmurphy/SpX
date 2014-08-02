@@ -1,10 +1,10 @@
 9
-0.0	ME1
-0.0	Liftoff
-7.0	Pitch_Kick
-162.0	MECO1
-164.0	Stage_Sep
-166.0	SE1
-515.0	ME2
-552.0	MECO2
-628.0	ME3
+0	-2.0	ME1
+0	0.0	Liftoff
+0	7.0	Pitch_Kick
+0	161.0	MECO1
+1	163.0	Stage_Sep
+1	165.0	SE1
+0	515.0	ME2
+0	552.0	MECO2
+0	628.0	ME3

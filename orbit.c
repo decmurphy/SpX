@@ -3,11 +3,11 @@
 #include<math.h>
 #include"common.h"
 
-Rocket F9	= {0.3, 10.52, {20000, 4900}, {390000, 75700}, 1200};
+Rocket F9[2]	= {{0.3, 10.52, 20000, 390000, 0}, {0.3, 10.52, 4900, 75700, 1200}};
 Engine M1D	= {282, 311, 650000, 720000};
 Engine M1Dv	= {0, 345, 0, 801000};
 
-int 	_pitch = 0,
+int 	_release = 0, _pitch = 0,
 	_ME1 = 0, _ME2 = 0, _ME3 = 0,
 	_MECO1 = 0, _MECO2 = 0, _MECO3 = 0,
 	_LBURN = 0, _BBURN = 0,
@@ -17,27 +17,18 @@ int 	_pitch = 0,
 
 int main(int argc, char *argv[]) {
 
+	double oldS = 0, newS = 0, apo = 0, per = 0;
+	int orbit = 0;
+
+	int i, N;
 	Event *event;
-	int i, N, line = -1;
-	char str[128];
 
-	FILE *in = fopen("profile.txt", "r");
-	while( fgets(str, sizeof(str), in) != NULL) {
+	init(&event, &N, argc, argv);
 
-		if(line == -1) {
-			sscanf(str, "%d", &N);
-			event = (Event*)calloc(N, sizeof(Event));
-		}
-		else {
-			sscanf(str, "%lf\t%s\n", &event[line].t, event[line].name);
-		}
-		line++;
-	}
-
-/************************************************************/
-
-	int old, new, orbit=0, crash=0;
-	double peri, apo;
+/*************************************************************************************************/
+/*	Launch/Pitch Kick/ Gravity Turn				*/
+/*	First Stage: Takeoff					*/
+/*************************************************************************************************/
 
 	FILE *f, *f1, *f2;
 	f = fopen("Stage1.dat", "w");
@@ -46,66 +37,58 @@ int main(int argc, char *argv[]) {
 
 	do{
 
-/*************************************************************************************************/
-/*	First Stage: Takeoff					*/
-/*************************************************************************************************/
-
+		/*	Execute events		*/
 		for(i=0;i<N;i++) {
-			if(fabs(t-event[i].t) < dt/2) {				// If an event in profile.txt occurs at
-				execute(event[i].name, 2, f1, 1);		// this time, execute the event
-			}
+			if(event[i].stage == 0 && fabs(t-event[i].t) < dt/2 && !_MECO1)	// If an event in profile.txt occurs at
+				execute(event[i].name, f1, 1);				// this time, execute the event
+			if(event[i].stage == 1 && fabs(t-event[i].t) < dt/2)
+				execute(event[i].name, f1, 1);
 		}
 
-		if((F9.Mf[1]<10 || VA > sqrt(G*Me/S)) && _SE1 && !_SECO1) {
-			output_telemetry("SECO", f1, 1);
-			MSECO(&_SECO1);
-			apo = S-Re;
-			peri = S-Re;
+		/*	SECO1			*/
+		if(!_SECO1 && VA[1] > sqrt(G*Me/S[1])) {
+			output_telemetry("SECO", f1, 1, 1);
+			printf("\t\t\t\t\t@ %g degrees\n", (-3*M_PI/2 + alpha[1] - beta[1])*180/M_PI);
+			MSECO(1, &_SECO1);
+			apo = S[1];
+			per = S[1];
 			dt = 0.1;
 		}
 
-		if(_SECO1) {
-			if(S-Re > apo)	apo = S-Re;
-			if(S-Re < peri) peri = S-Re;
-			if(S-Re < 1e5) {
-				crash = 1;
-				break;
+		/*	Orbit			*/
+		else if(_SECO1 && oldS<0 && newS>0) {
+			orbit = 1;
+		}
+
+		if(!_MECO1) {
+			leapfrog_step_coriolis(0, _MECO1);
+			output_file(0, f, 1);
+		}
+
+		if(_MECO1 && !orbit) {
+			leapfrog_step_coriolis(1, _MECO1);
+			output_file(1, f2, 1);
+
+			oldS = newS;
+			newS = s[1][0];
+			if(_SECO1) {
+				apo = S[1] > apo ? S[1] : apo;
+				per = S[1] < per ? S[1] : per;
 			}
 		}
 
-		leapfrog_step_coriolis(2, _MECO1);
-		angles_coriolis();
-		if(t > 55)
-			grav_turn_coriolis(_MECO1, _SECO1);
-
-		if(!_MECO1)
-			fprintf(f, "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, VR, A, M, q);
-		else
-			fprintf(f2, "%g\t%f\t%f\t%f\t%f\t%f\t%f\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, VR, A, M);
-
-/*************************************************************************************************/
-
-		if(s[0]>0)	new = 1;
-		else		new = 2;
-
-		if(old==2 && new==1)
-			orbit++;
-		old = new;
-
-/*************************************************************************************************/
+		t += dt;
 
 	}
-	while(orbit<2);
+	while(!orbit);
 
-	if(crash) printf("\nT+%.0f\t\t\tCrash\t\t%.2fkm x %.2fkm\n", t, peri*1e-3, apo*1e-3);
-	else printf("\nT+%.0f\t\t\tOrbit\t\t%.2fkm x %.2fkm\n", t, peri*1e-3, apo*1e-3);
+	printf("\nT%+07.2f\t%16.16s\t%.2f%s x %.2f%s\n", t, "Orbit", (per-Re)*1e-3, "km", (apo-Re)*1e-3, "km");
 
 	free(event);
 
 	fclose(f);
 	fclose(f1);
 	fclose(f2);
-	fclose(in);
 
 	return 0;
 }

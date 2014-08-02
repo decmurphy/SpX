@@ -2,7 +2,7 @@ TARGET = earth stage1 stage2
 TEST = earth_run stage1_run stage2_run
 CC = gcc
 LIBS = -lm
-CFLAGS = -O3 -g
+CFLAGS = -O3 -g -W -Wall
 DEPS = common.h
 
 default: 1
@@ -25,13 +25,13 @@ stage1: return.o
 	@$(CC) $(CFLAGS) $< -o $@ $(LIBS)
 
 stage1_run:
-	@./stage1
+	@./stage1 -f profile.txt
 
 stage2: orbit.o
 	@$(CC) $(CFLAGS) $< -o $@ $(LIBS)
 
 stage2_run:
-	@./stage2
+	@./stage2 -f profile.txt
 
 ###########################################################
 

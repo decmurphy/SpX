@@ -3,11 +3,11 @@
 #include<math.h>
 #include"common.h"
 
-Rocket F9	= {0.3, 10.52, {20000, 4900}, {390000, 72700}, 1200};
+Rocket F9[2]	= {{0.3, 10.52, 20000, 390000, 0}, {0.3, 10.52, 4900, 75700, 1200}};
 Engine M1D	= {282, 311, 650000, 720000};
 Engine M1Dv	= {0, 345, 0, 801000};
 
-int 	_pitch = 0,
+int 	_release = 0, _pitch = 0,
 	_ME1 = 0, _ME2 = 0, _ME3 = 0,
 	_MECO1 = 0, _MECO2 = 0, _MECO3 = 0,
 	_LBURN = 0, _BBURN = 0,
@@ -17,26 +17,12 @@ int 	_pitch = 0,
 
 int main(int argc, char *argv[]) {
 
-	int crash = 0;
+	int touch = 0;
 
-/*************************************************************************************************/
-
+	int i, N;
 	Event *event;
-	int i, N, line = -1;
-	char str[128];
 
-	FILE *in = fopen("profile.txt", "r");
-	while( fgets(str, sizeof(str), in) != NULL) {
-
-		if(line == -1) {
-			sscanf(str, "%d", &N);
-			event = (Event*)calloc(N, sizeof(Event));
-		}
-		else {
-			sscanf(str, "%lf\t%s\n", &event[line].t, event[line].name);
-		}
-		line++;
-	}
+	init(&event, &N, argc, argv);
 
 /*************************************************************************************************/
 /*	Launch/Pitch Kick/Gravity turn				*/
@@ -50,68 +36,48 @@ int main(int argc, char *argv[]) {
 
 	do{
 
-		for(i=0;i<N;i++)
-			if(fabs(t-event[i].t) < dt/2)				// If an event in profile.txt occurs at
-				execute(event[i].name, 1, f1, 0);		// this time, execute the event
+		/*	Execute events		*/
+		for(i=0;i<N;i++) {
+			if(event[i].stage == 0 && fabs(t-event[i].t) < dt/2)	// If an Stage1 event in profile.txt occurs at
+				execute(event[i].name, f1, 0);			// this time, execute the event
+			if(event[i].stage == 1 && fabs(t-event[i].t) < dt/2)	// Stage2 events
+				execute(event[i].name, f1, 0);
+		}
 
-		if((F9.Mf[0] < 5 || (_LBURN && S-Re < 0.1)) && !_MECO3) {	// If Alt = 0.1m or Fuel runs out
-			output_telemetry("MECO3", f1, 0);
-			MSECO(&_MECO3);
+		/*	End Landing Burn	*/
+		if((F9[0].Mf < 5 || (_LBURN && S[0]-Re < 0.01)) && !_MECO3) {	// If Alt = 0.1m or Fuel runs out
+			output_telemetry("MECO3", f1, 0, 0);
+			MSECO(0, &_MECO3);
 			_LBURN = 0;
 		}
-		else if(S<Re) {							// If Alt = 0.0m
-			output_telemetry("Touchdown", NULL, 0);
-			break;
+
+		/*	Touchdown		*/
+		else if(_release && S[0]<Re && !touch) {			// If Alt = 0.0m
+			output_telemetry("Touchdown", NULL, 0, 0);
+			touch = 1;
+			dt = 0.1;
 		}
 
-	/**********************************************************************/
-
-		leapfrog_step_no_coriolis(1, _MECO1);
-		angles_no_coriolis();
-		if(t > 55 && !_MECO1)
-			grav_turn_no_coriolis(_MECO1, _SECO1);
-
-		if(_BBURN || _LBURN)
-			flip(2);						// flip(2) keeps rocket pointed retrograde during burns
-		if(_LBURN && mod(t, 5) < dt)
-			update_landing_throttle();				// update landing throttle every 5s
-
-
-		fprintf(f, "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, V, A/g0, M, q);
-
-	}
-	while(1);
-	printf("\n");
-
-/*************************************************************************************************/
-/*	Second Stage: Orbital burn/Drift			*/
-/*************************************************************************************************/
-
-	reset_variables(&_pitch, &_ME1, &_MECO1);
-
-	do{
-
-		for(i=0;i<N;i++)
-			if(fabs(t-event[i].t) < dt/2)
-				execute(event[i].name, 2, f1, 0);
-
-		if((F9.Mf[1]<10 || V > sqrt(G*Me/S)) && !_SECO1) {		// If Fuel runs out, or reach orbital velocity
-			output_telemetry("SECO", f1, 0);
-			MSECO(&_SECO1);
-			break;
+		/*	SECO1			*/
+		else if(!_SECO1 && V[1] > sqrt(G*Me/S[1])) {
+			output_telemetry("SECO1", f1, 1, 0);
+			MSECO(1, &_SECO1);
 		}
 
-	/**********************************************************************/
+		if(!touch) {
+			leapfrog_step_no_coriolis(0, _MECO1);
+			output_file(0, f, 0);
+		}
 
-		leapfrog_step_no_coriolis(2, _MECO1);
-		angles_no_coriolis();
-		if(t > 55)
-			grav_turn_no_coriolis(_MECO1, _SECO1);
+		if(_MECO1) {
+			leapfrog_step_no_coriolis(1, _MECO1);
+			output_file(1, f2, 0);
+		}
 
-		fprintf(f2, "%g\t%f\t%f\t%f\t%f\t%f\t%f\n", t, s[0]*1e-3, (s[1]-Re)*1e-3, (S-Re)*1e-3, V, A/g0, M);
+		t += dt;
 
 	}
-	while(1);
+	while(!touch);
 	printf("\n");
 
 	free(event);
@@ -119,7 +85,6 @@ int main(int argc, char *argv[]) {
 	fclose(f);
 	fclose(f1);
 	fclose(f2);
-	fclose(in);
 
 	return 0;
 }
