@@ -9,9 +9,8 @@ OG2 Launch code
 
 ### To run from command line: In "src" directory, type "make 1" for Stage 1 launch/re-entry/landing, or "make 2" for Stage 2 launch/orbit ###
 
-return.c is simulated from the reference frame of an observer standing on the Earth - i.e it does NOT take into account the Coriolis effect. This is handy for any boost stage trajectories.
-
-For second stage trajectories (like trying to achieve orbit), orbit.c gives the physical result.
+return.c is optimised for any boost stage trajectories. Best to run this with the Coriolis effect turned off (command line option "-s 0")
+For second stage trajectories (like trying to achieve orbit), you wat the Coriolis effect turned on for that extra boost. Running orbit.c with command line option "-s 1" gives the best result.
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
