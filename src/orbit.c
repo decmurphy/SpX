@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		/*	SECO1			*/
-		if(!_SECO1 && VA[1] > sqrt(G*Me/S[1])) {
+		if((F9[1].Mf < 5 || VA[1] > sqrt(G*Me/S[1])) && !_SECO1) {
 			output_telemetry("SECO-1", f1, 1);
 			printf("\t\t\t\t\t@ %g degrees\n", (-3*M_PI/2 + alpha[1] - beta[1])*180/M_PI);
 			MSECO(1, &_SECO1);

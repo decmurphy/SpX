@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		/*	SECO1			*/
-		else if(!_SECO1 && VA[1] > sqrt(G*Me/S[1])) {
+		else if((F9[1].Mf < 5 || VA[1] > sqrt(G*Me/S[1])) && !_SECO1) {
 			output_telemetry("SECO-1", f1, 1);
 			MSECO(1, &_SECO1);
 		}
