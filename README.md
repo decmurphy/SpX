@@ -3,8 +3,6 @@ SpX
 
 OG2 Launch code
 
-# If anyone wants to use this, be sound about it. Throw me an email at murphd37@tcd.ie . I'll definitely say yes, I just wanna know what it's being used for :) #
-
 ### To run from command line: "make 1" for Stage 1 launch/re-entry/landing, or "make 2" for Stage 2 launch/orbit ###
 
 return.c is simulated from the reference frame of an observer standing on the Earth - i.e it does NOT take into account the Coriolis effect. This is handy for any boost stage trajectories.

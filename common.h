@@ -37,24 +37,22 @@ extern Engine M1D;
 extern Engine M1Dv;
 
 extern int 	_release, _pitch,
-		_ME1, _ME2, _ME3,
+		_MEI1, _MEI2, _MEI3,
 		_MECO1, _MECO2, _MECO3,
 		_LBURN, _BBURN,
-		_SE1, _SECO1;
+		_SEI1, _SECO1;
 
 int engines[2];
-double S[2], V[2], VA[2], VR[2], A[2], M[2];		// Distance, Velocity, Absolute V, Relative V, Acceleration, Mass
-double p[2], q, Ft[2], Fd;				// throttle, areo pressure, thrust, drag, fuel pointer (to 1st or 2nd stage)
-double dm, t = -10.0;					// rate of fuel consumption, time
-double dt = 0.001;					// time step
+double S[2], VA[2], VR[2], A[2], M[2];	// Distance, Velocity, Absolute V, Relative V, Acceleration, Mass
+double p[2], q, Ft[2], Fd;		// throttle, aero pressure, thrust, drag
+double dm, t = -10.0;			// rate of fuel consumption, time
+double dt = 0.001;			// time step
 
-				// inclination (rads) = 28.49*M_PI/180;
-double vE = 407.6614278; 	// Earth velocity at Cape Canveral = 2*M_PI*Re*cos(incl)/(24*60*60);
+double vE = 0.0;		// inclination (rads) = 28.49*M_PI/180;
 
 double F[2][2] = {{0}};		// x,y Forces on vehicle
 double s[2][2] = {{0}};		// x,y distance
 double a[2][2] = {{0}};		// x,y acceleration
-double v[2][2] = {{0}};		// x,y absolute velocity
 double vA[2][2] = {{0}};	// x,y absolute velocity
 double vR[2][2] = {{0}};	// x,y relative velocity (rel. to Earth)
 
@@ -72,9 +70,10 @@ inline void init(Event **event, int *N, int argc, char **argv)
 	int opt, line = -1;
 	char str[128], inputfile[128];
 
-	while( (opt=getopt(argc,argv,"f:")) != -1) {
+	while( (opt=getopt(argc,argv,"f:s:")) != -1) {
 		switch(opt) {
 			case 'f': strncpy(inputfile, optarg, sizeof(inputfile)); break;
+			case 's': vE = atoi(optarg)==0 ? 0 : 407.6614278; break; 	// Earth velocity at Cape Canveral
 		}
 	}
 
@@ -94,16 +93,11 @@ inline void init(Event **event, int *N, int argc, char **argv)
 	fclose(in);
 }	
 
-inline void output_telemetry(char* event, FILE *f2, int i, int coriolis)	// i = stage
+inline void output_telemetry(char* event, FILE *f2, int i)	// i = stage
 {
 
-	double temp_s0 = s[i][0], temp_S = S[i]-Re, temp_V = V[i];
+	double temp_s0 = s[i][0] - vE*t, temp_S = S[i]-Re, temp_V = VR[i];
 	char *dist = "m", *vel = "m/s";
-
-	if(coriolis) {
-		temp_s0 -= vE*t;
-		temp_V = VR[i];
-	}
 
 	if(temp_s0 > 1e3 || temp_S > 1e3) {
 		temp_s0 *= 1e-3;
@@ -121,31 +115,25 @@ inline void output_telemetry(char* event, FILE *f2, int i, int coriolis)	// i = 
 	printf("T%+07.2f\t%16.16s\t%.2f%s x %.2f%s @ %.2f%s\n", t, event, temp_s0, dist, temp_S, dist, temp_V, vel);
 }
 
-inline void output_file(int i, FILE *f, int coriolis)
+inline void output_file(int i, FILE *f)
 {
-	if(coriolis)
-		fprintf(f, "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", t, s[i][0]*1e-3, (s[i][1]-Re)*1e-3, (S[i]-Re)*1e-3, VR[i], A[i]/g0, M[i], p[i]);
-	else
-		fprintf(f, "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", t, s[i][0]*1e-3, (s[i][1]-Re)*1e-3, (S[i]-Re)*1e-3, V[i], A[i]/g0, M[i], p[i]);
+	fprintf(f, "%g\t%f\t%f\t%f\t%f\t%f\t%f\t%f\n", t, s[i][0]*1e-3, (s[i][1]-Re)*1e-3, (S[i]-Re)*1e-3, VR[i], A[i]/g0, M[i], p[i]);
 }
 
 inline void ignition(int i, int *x, int num_engs)
 {
 	p[i] = 1.0;					// p is throttle
-	*x = 1;
 	engines[i] = num_engs;
-
+	*x = 1;
 }
 
-inline void first_step(int coriolis)
+inline void first_step()
 {
-
 	F[0][1] = 9*M1D.Th_sl - M[0]*g0;
 	a[0][1] = F[0][1]/M[0];
 
-	if(coriolis) 	vA[0][0] = vE;				// Absolute velocity in x-direction = velocity of earth at surface
-	if(coriolis) 	vA[0][1] += a[0][1]*dt/2;
-	else		v[0][1] += a[0][1]*dt/2;
+	vA[0][0] = vE;				// Absolute velocity in x-direction = velocity of earth at surface
+	vA[0][1] += a[0][1]*dt/2;
 
 	S[0] = sqrt(s[0][0]*s[0][0] + s[0][1]*s[0][1]);
 	A[0] = sqrt(a[0][0]*a[0][0] + a[0][1]*a[0][1]);
@@ -168,16 +156,10 @@ inline void sync_stages()
 {
 	s[1][0] = s[0][0];
 	s[1][1] = s[0][1];
-	v[1][0] = v[0][0];
-	v[1][1] = v[0][1];
-	vR[1][0] = vR[0][0];
-	vR[1][1] = vR[0][1];
 	vA[1][0] = vA[0][0];
 	vA[1][1] = vA[0][1];
 
 	S[1] = S[0];
-	V[1] = V[0];
-	VR[1] = VR[0];
 	VA[1] = VA[0];
 
 	alpha[1] = alpha[0];
@@ -192,11 +174,9 @@ inline void stage_sep()
 		M[i] = F9[i].Mr + F9[i].Mf + F9[i].Mp;
 }
 
-inline void flip(int i, int x)
+inline void flip(int i)
 {
-	gam[i] = 	(x==1) ? beta[i] + M_PI/2 :	// parallel to earth
-			(x==2) ? alpha[i] + M_PI :	// retrograde
-			gam[i];
+	gam[i] = alpha[i] + M_PI;	// retrograde
 }
 
 /////////////////////////////////////////////////
@@ -231,15 +211,15 @@ inline double Isp(double h)
 			    : M1D.Isp_vac;
 }
 
-inline double GetThrust(double H, int i, int sync)
+inline double GetThrust(double H, int i)
 {
-	return (i==0 || !sync) ? Isp(H-Re)*236*g0	// 236 kg/s = M1D rate of fuel consumption
+	return (i==0 || !_MECO1) ? Isp(H-Re)*236*g0	// 236 kg/s = M1D rate of fuel consumption
 				     : M1Dv.Th_vac;
 }
 
 /*
 	This function tests a throttle value to find out, at a certain throttle, what
-	height will the vehicle reache zero vertical velocity.
+	height will the vehicle reach zero vertical velocity.
 */
 
 double throttle_test(double hy, double ux, double uy, double mf, double throttle)
@@ -250,7 +230,7 @@ double throttle_test(double hy, double ux, double uy, double mf, double throttle
 
 	VEL = sqrt(ux*ux + uy*uy);
 
-	ft = throttle*GetThrust(hy, 0, 1);
+	ft = throttle*GetThrust(hy, 0);
 
 	do
 	{
@@ -259,7 +239,7 @@ double throttle_test(double hy, double ux, double uy, double mf, double throttle
 
 		fd = (0.5)*F9[0].Cd*F9[0].A*rho(hy-Re)*VEL*VEL;
 
-		flip(0, 2);
+		flip(0);
 
 		fx = ft*cos(gam[0]) + fd*cos(alpha[0]+M_PI) + mass*g(hy)*cos(beta[0]+M_PI);
 		ax = fx/mass;
@@ -280,7 +260,7 @@ double throttle_test(double hy, double ux, double uy, double mf, double throttle
 
 /*
 	This guy calls the above function to get as close to a hoverslam as possible. Need to keep calculating this
-	as we fall cause it changes with rounding errors etc. I think I re-calculate it every 5 seconds
+	as we fall cause it changes with rounding errors etc. I re-calculate it every 5 seconds, gets me a pretty good result
 */
 
 inline double get_landing_throttle(double H, double ux, double uy, double mf)
@@ -311,10 +291,10 @@ inline double get_landing_throttle(double H, double ux, double uy, double mf)
 
 inline void update_landing_throttle()
 {
-	p[0] = get_landing_throttle(S[0], v[0][0], v[0][1], F9[0].Mf);
+	p[0] = get_landing_throttle(S[0], vR[0][0], vR[0][1], F9[0].Mf);
 }
 
-inline void angles_coriolis(int i)
+inline void angles(int i)
 {
 /*
 	beta is the angle through which gravity pulls the vehicle. alpha is the angle of attack relative to earth.
@@ -331,23 +311,10 @@ inline void angles_coriolis(int i)
 
 }
 
-inline void angles_no_coriolis(int i)
-{
-
-	beta[i] = acos(s[i][0]/S[i]);
-	if(s[i][1]<0)
-		beta[i] = 2*M_PI - beta[i];
-
-	alpha[i] = acos(v[i][0]/V[i]);
-	if(v[i][1]<0)
-		alpha[i] = 2*M_PI - alpha[i];
-
-}
-
-inline void grav_turn_coriolis(int i, int _M1, int _S1)
+inline void grav_turn(int i)
 {
 	gam[i] = alpha[i];
-	if(_M1 && cos(beta[i]-alpha[i])<0 && !_S1)
+	if(_MECO1 && cos(beta[i]-alpha[i])<0 && !_SECO1)
 		gam[i] = asin(-M[i]*g(S[i])*sin(beta[i]+M_PI)/Ft[i]);
 /*
 	The line above ensures that if the gravity turn makes the 2nd stage point down towards earth,
@@ -357,9 +324,12 @@ inline void grav_turn_coriolis(int i, int _M1, int _S1)
 	until it reaches orbital velocity. Should never be used if gravity turn executed
 	properly though, as it's super inefficient.
 */
-
+/*
+	The next few lines are OG2 course corrections
+	Trial and error. Lots of corrections for ultra steep trajectory.
+*/
 	if(VR[1] > 2200)
-		p[1] = 0.7;			// Throttle down to 70%
+		p[1] = 0.7;				// Throttle down to 70%
 	if(VR[1] > 2900)
 		gam[1] = beta[1] - M_PI/2;		// go horizontal rel. to earth
 	if(VR[1] > 3400)
@@ -370,31 +340,6 @@ inline void grav_turn_coriolis(int i, int _M1, int _S1)
 		gam[1] = beta[1] - M_PI/2 - 0.3;
 	if(VR[1] > 6200)
 		gam[1] = beta[1] - M_PI/2 - 0.4;
-
-/*
-	Trial and error. Lots of course corrections for OG2's ultra steep trajectory.
-*/
-}
-
-inline void grav_turn_no_coriolis(int i, int _M1, int _S1)
-{
-	gam[i]  = alpha[i];
-	if(_M1 && cos(beta[i]-alpha[i])<0 && !_S1)
-		gam[i] = asin(-M[i]*g(S[i])*sin(beta[i]+M_PI)/Ft[i]);
-
-	if(V[1] > 2200)
-		p[1] = 0.7;
-	if(V[1] > 2900)
-		gam[1] = beta[1] - M_PI/2;
-	if(V[1] > 3400)
-		gam[1] = beta[1] - M_PI/2 - 0.1;
-	if(V[1] > 3900)
-		gam[1] = beta[1] - M_PI/2 - 0.2;
-	if(V[1] > 4400)
-		gam[1] = beta[1] - M_PI/2 - 0.3;
-	if(V[1] > 6200)
-		gam[1] = beta[1] - M_PI/2 - 0.4;
-
 }
 
 double mod(double a, double b)
@@ -406,10 +351,10 @@ double mod(double a, double b)
 	Leapfrog integrator used for moving ma boi F9. It's conservative which is nice. Fuck you Euler.
 */
 
-void leapfrog_step_coriolis(int i, int sync) // i = stage
+void leapfrog_step(int i) // i = stage
 {
 
-	if(_ME1) {
+	if(_MEI1) {
 		dm = engines[i]*p[i]*236*dt;
 		F9[i].Mf -= dm;
 		M[i] -= dm;
@@ -418,7 +363,7 @@ void leapfrog_step_coriolis(int i, int sync) // i = stage
 	if(_release) {
 		q = 0.5*rho(S[i]-Re)*VR[i]*VR[i]*1e-3;			// Aerodynamic stress
 		Fd = (0.5)*F9[i].Cd*F9[i].A*rho(S[i]-Re)*VR[i]*VR[i];	// Drag
-		Ft[i] = engines[i]*p[i]*GetThrust(S[i], i, sync);		// Thrust
+		Ft[i] = engines[i]*p[i]*GetThrust(S[i], i);		// Thrust
 
 		/* x-direction	*/
 		F[i][0] = Ft[i]*cos(gam[i]) + Fd*cos(alpha[i]+M_PI) + M[i]*g(S[i])*cos(beta[i]+M_PI);
@@ -440,103 +385,63 @@ void leapfrog_step_coriolis(int i, int sync) // i = stage
 		A[i] = sqrt(a[i][0]*a[i][0] + a[i][1]*a[i][1]);
 	}
 
-	if(_release)	angles_coriolis(i);
+	if(_release)	angles(i);
 	if(t > 55) {
-		if(i==1) 		grav_turn_coriolis(i, _MECO1, _SECO1);
-		if(i==0 && !sync)	grav_turn_coriolis(i, _MECO1, _SECO1);
+		if(i==1) 		grav_turn(i);
+		if(i==0 && !_MECO1)	grav_turn(i);
 	}
-
+	if(_BBURN || _LBURN)
+		flip(0);
+	if(_LBURN && mod(t, 5) < dt)
+		update_landing_throttle();
 }
 
-void leapfrog_step_no_coriolis(int i, int sync)
+void execute(char *name, FILE *f)
 {
-
-	if(_ME1) {
-		dm = engines[i]*p[i]*236*dt;
-		F9[i].Mf -= dm;
-		M[i] -= dm;
-	}
-
-	if(_release) {
-		q = 0.5*rho(S[i]-Re)*V[i]*V[i]*1e-3;
-		Fd = (0.5)*F9[i].Cd*F9[i].A*rho(S[i]-Re)*V[i]*V[i];
-		Ft[i] = engines[i]*p[i]*GetThrust(S[i], i, sync);
-
-		/* x-direction	*/
-		F[i][0] = Ft[i]*cos(gam[i]) + Fd*cos(alpha[i]+M_PI) + M[i]*g(S[i])*cos(beta[i]+M_PI);
-		s[i][0] += v[i][0]*dt;
-		a[i][0] = F[i][0]/M[i];
-		v[i][0] += a[i][0]*dt;
-	
-		/* y-direction	*/
-		F[i][1] = Ft[i]*sin(gam[i]) + Fd*sin(alpha[i]+M_PI) + M[i]*g(S[i])*sin(beta[i]+M_PI);
-		s[i][1] += v[i][1]*dt;
-		a[i][1] = F[i][1]/M[i];
-		v[i][1] += a[i][1]*dt;
-
-		S[i] = sqrt(s[i][0]*s[i][0] + s[i][1]*s[i][1]);
-		V[i] = sqrt(v[i][0]*v[i][0] + v[i][1]*v[i][1]);
-		A[i] = sqrt(a[i][0]*a[i][0] + a[i][1]*a[i][1]);
-	}
-
-	if(_release)	angles_no_coriolis(i);
-	if(t > 55) {
-		if(i==1) 		grav_turn_no_coriolis(i, _MECO1, _SECO1);
-		if(i==0 && !sync)	grav_turn_no_coriolis(i, _MECO1, _SECO1);
-	}
-
-	if(i==0) {
-		if(_BBURN || _LBURN)		flip(i, 2);			// flip(2) keeps rocket pointed retrograde during burns
-		if(_LBURN && mod(t, 5) < dt) 	update_landing_throttle();	// update landing throttle every 5 seconds
-	}
-}
-
-void execute(char *name, FILE *f, int coriolis)
-{
-	if(!strcmp(name, "ME1")) {
-		ignition(0, &_ME1, 9);
-		output_telemetry(name, NULL, 0, coriolis);
+	if(!strcmp(name, "MEI-1")) {
+		ignition(0, &_MEI1, 9);
+		output_telemetry(name, NULL, 0);
 	}
 	else if(!strcmp(name, "Liftoff")) {
 		_release = 1;
-		first_step(coriolis);
-		output_telemetry(name, NULL, 0, coriolis);
+		first_step();
+		output_telemetry(name, NULL, 0);
 	}
 	else if(!strcmp(name, "Pitch_Kick")) {
 		pitch_kick(&_pitch);
-		output_telemetry(name, NULL, 0, coriolis);
+		output_telemetry(name, NULL, 0);
 	}
-	else if(!strcmp(name, "MECO1")) {
+	else if(!strcmp(name, "MECO-1")) {
 		MSECO(0, &_MECO1);
 		sync_stages();
-		output_telemetry(name, f, 1, coriolis);
+		output_telemetry(name, f, 1);
 	}
 	else if(!strcmp(name, "Stage_Sep")) {
 		stage_sep();
-		output_telemetry(name, NULL, 0, coriolis);
+		output_telemetry(name, NULL, 0);
 	}
-	else if(!strcmp(name, "SE1")) {
-		ignition(1, &_SE1, 1);
-		output_telemetry(name, NULL, 1, coriolis);
+	else if(!strcmp(name, "SEI-1")) {
+		ignition(1, &_SEI1, 1);
+		output_telemetry(name, NULL, 1);
 	}
-	else if(!strcmp(name, "ME2")) {
-		ignition(0, &_ME2, 3);
+	else if(!strcmp(name, "MEI-2")) {
+		ignition(0, &_MEI2, 3);
 		_BBURN = 1;
-		output_telemetry(name, f, 0, coriolis);
+		output_telemetry(name, f, 0);
 	}
-	else if(!strcmp(name, "MECO2")) {
+	else if(!strcmp(name, "MECO-2")) {
 		MSECO(0, &_MECO2);
 		_BBURN = 0;
-		output_telemetry(name, f, 0, coriolis);
+		output_telemetry(name, f, 0);
 	}
-	else if(!strcmp(name, "SECO1")) {
+	else if(!strcmp(name, "SECO-1")) {
 		MSECO(1, &_SECO1);
-		output_telemetry(name, f, 1, coriolis);
+		output_telemetry(name, f, 1);
 	}
-	else if(!strcmp(name, "ME3")) {
-		ignition(0, &_ME3, 1);
+	else if(!strcmp(name, "MEI-3")) {
+		ignition(0, &_MEI3, 1);
 		_LBURN = 1;
-		output_telemetry(name, f, 0, coriolis);
+		output_telemetry(name, f, 0);
 	}
 }
 

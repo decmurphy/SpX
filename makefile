@@ -25,13 +25,13 @@ stage1: return.o
 	@$(CC) $(CFLAGS) $< -o $@ $(LIBS)
 
 stage1_run:
-	@./stage1 -f profile.txt
+	@./stage1 -s 0 -f profile.txt
 
 stage2: orbit.o
 	@$(CC) $(CFLAGS) $< -o $@ $(LIBS)
 
 stage2_run:
-	@./stage2 -f profile.txt
+	@./stage2 -s 1 -f profile.txt
 
 ###########################################################
 

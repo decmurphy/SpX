@@ -8,10 +8,10 @@ Engine M1D	= {282, 311, 650000, 720000};
 Engine M1Dv	= {0, 345, 0, 801000};
 
 int 	_release = 0, _pitch = 0,
-	_ME1 = 0, _ME2 = 0, _ME3 = 0,
+	_MEI1 = 0, _MEI2 = 0, _MEI3 = 0,
 	_MECO1 = 0, _MECO2 = 0, _MECO3 = 0,
 	_LBURN = 0, _BBURN = 0,
-	_SE1 = 0, _SECO1 = 0;
+	_SEI1 = 0, _SECO1 = 0;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -40,14 +40,14 @@ int main(int argc, char *argv[]) {
 		/*	Execute events		*/
 		for(i=0;i<N;i++) {
 			if(event[i].stage == 0 && fabs(t-event[i].t) < dt/2 && !_MECO1)	// If an event in profile.txt occurs at
-				execute(event[i].name, f1, 1);				// this time, execute the event
+				execute(event[i].name, f1);				// this time, execute the event
 			if(event[i].stage == 1 && fabs(t-event[i].t) < dt/2)
-				execute(event[i].name, f1, 1);
+				execute(event[i].name, f1);
 		}
 
 		/*	SECO1			*/
 		if(!_SECO1 && VA[1] > sqrt(G*Me/S[1])) {
-			output_telemetry("SECO", f1, 1, 1);
+			output_telemetry("SECO-1", f1, 1);
 			printf("\t\t\t\t\t@ %g degrees\n", (-3*M_PI/2 + alpha[1] - beta[1])*180/M_PI);
 			MSECO(1, &_SECO1);
 			apo = S[1];
@@ -55,22 +55,22 @@ int main(int argc, char *argv[]) {
 			dt = 0.1;
 		}
 
-		/*	Orbit			*/
-		else if(_SECO1 && oldS<0 && newS>0) {
-			orbit = 1;
-		}
-
+		/* 	Advance first stage	*/
 		if(!_MECO1) {
-			leapfrog_step_coriolis(0, _MECO1);
-			output_file(0, f, 1);
+			leapfrog_step(0);
+			output_file(0, f);
 		}
 
+		/* 	Advance second stage	*/
 		if(_MECO1 && !orbit) {
-			leapfrog_step_coriolis(1, _MECO1);
-			output_file(1, f2, 1);
+			leapfrog_step(1);
+			output_file(1, f2);
 
 			oldS = newS;
 			newS = s[1][0];
+			if(oldS<0 && newS>0)
+				orbit = 1;
+
 			if(_SECO1) {
 				apo = S[1] > apo ? S[1] : apo;
 				per = S[1] < per ? S[1] : per;
