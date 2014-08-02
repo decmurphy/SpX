@@ -1,7 +1,12 @@
 #include<stdio.h>
 #include<stdlib.h>
-#include<math.h>
-#include"common.h"
+
+#include"initialise.h"
+#include"io.h"
+#include"motion.h"
+#include"events.h"
+#include"functions.h"
+#include"landing.h"
 
 Rocket F9[2]	= {{0.3, 10.52, 20000, 390000, 0}, {0.3, 10.52, 4900, 75700, 1200}};
 Engine M1D	= {282, 311, 650000, 720000};
@@ -17,8 +22,7 @@ int 	_release = 0, _pitch = 0,
 
 int main(int argc, char *argv[]) {
 
-	double oldS = 0, newS = 0, apo = 0, per = 0;
-	int orbit = 0;
+	int touch = 0;
 
 	int i, N;
 	Event *event;
@@ -26,8 +30,8 @@ int main(int argc, char *argv[]) {
 	init(&event, &N, argc, argv);
 
 /*************************************************************************************************/
-/*	Launch/Pitch Kick/ Gravity Turn				*/
-/*	First Stage: Takeoff					*/
+/*	Launch/Pitch Kick/Gravity turn				*/
+/*	First Stage: Flip/Entry burn/Landing burn		*/
 /*************************************************************************************************/
 
 	FILE *f, *f1, *f2;
@@ -39,50 +43,49 @@ int main(int argc, char *argv[]) {
 
 		/*	Execute events		*/
 		for(i=0;i<N;i++) {
-			if(event[i].stage == 0 && fabs(t-event[i].t) < dt/2 && !_MECO1)	// If an event in profile.txt occurs at
-				execute(event[i].name, f1);				// this time, execute the event
-			if(event[i].stage == 1 && fabs(t-event[i].t) < dt/2)
+			if(event[i].stage == 0 && fabs(t-event[i].t) < dt/2)	// If an Stage1 event in profile.txt occurs at
+				execute(event[i].name, f1);			// this time, execute the event
+			if(event[i].stage == 1 && fabs(t-event[i].t) < dt/2)	// Stage2 events
 				execute(event[i].name, f1);
 		}
 
-		/*	SECO1			*/
-		if(!_SECO1 && VA[1] > sqrt(G*Me/S[1])) {
-			output_telemetry("SECO-1", f1, 1);
-			printf("\t\t\t\t\t@ %g degrees\n", (-3*M_PI/2 + alpha[1] - beta[1])*180/M_PI);
-			MSECO(1, &_SECO1);
-			apo = S[1];
-			per = S[1];
+		/*	End Landing Burn	*/
+		if((F9[0].Mf < 5 || (_LBURN && S[0]-Re < 0.01)) && !_MECO3) {	// If Alt = 0.1m or Fuel runs out
+			output_telemetry("MECO-3", f1, 0);
+			MSECO(0, &_MECO3);
+			_LBURN = 0;
+		}
+
+		/*	Touchdown		*/
+		else if(_release && S[0]<Re && !touch) {			// If Alt = 0.0m
+			output_telemetry("Touchdown", NULL, 0);
+			touch = 1;
 			dt = 0.1;
 		}
 
-		/* 	Advance first stage	*/
-		if(!_MECO1) {
+		/*	SECO1			*/
+		else if(!_SECO1 && VA[1] > sqrt(G*Me/S[1])) {
+			output_telemetry("SECO-1", f1, 1);
+			MSECO(1, &_SECO1);
+		}
+
+		/*	Advance First stage	*/
+		if(!touch) {
 			leapfrog_step(0);
 			output_file(0, f);
 		}
 
-		/* 	Advance second stage	*/
-		if(_MECO1 && !orbit) {
+		/*	Advance Second stage	*/
+		if(_MECO1) {
 			leapfrog_step(1);
 			output_file(1, f2);
-
-			oldS = newS;
-			newS = s[1][0];
-			if(oldS<0 && newS>0)
-				orbit = 1;
-
-			if(_SECO1) {
-				apo = S[1] > apo ? S[1] : apo;
-				per = S[1] < per ? S[1] : per;
-			}
 		}
 
 		t += dt;
 
 	}
-	while(!orbit);
-
-	printf("\nT%+07.2f\t%16.16s\t%.2f%s x %.2f%s\n", t, "Orbit", (per-Re)*1e-3, "km", (apo-Re)*1e-3, "km");
+	while(!touch);
+	printf("\n");
 
 	free(event);
 
