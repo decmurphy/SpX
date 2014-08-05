@@ -26,13 +26,13 @@ stage1: return.o
 	$(CC) -I$(INCL) $(CFLAGS) $< -o $@ $(LIBS)
 
 stage1_run:
-	./stage1 -s 0 -f profile.txt
+	./stage1 -c 0 -f profile.txt
 
 stage2: orbit.o
 	$(CC) -I$(INCL) $(CFLAGS) $< -o $@ $(LIBS)
 
 stage2_run:
-	./stage2 -s 1 -f profile.txt
+	./stage2 -c 1 -f profile.txt
 
 ###########################################################
 
