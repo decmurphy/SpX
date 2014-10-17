@@ -5,8 +5,6 @@ OG2 Launch code
 ## Now included - make your own flight profile! ##
 ## See bottom of this file ##
 
-# If you want to use this, be sound about it and throw me an email at murphd37@tcd.ie . I'll definitely say yes, I just wanna know what it's being used for :) #
-
 ### To run from command line: In "src" directory, type "make 1" for Stage 1 launch/re-entry/landing, or "make 2" for Stage 2 launch/orbit ###
 
 return.c is optimised for any boost stage trajectories. Best to run this with the Coriolis effect turned off (command line option "-c 0")
@@ -18,7 +16,7 @@ The main thing I want to improve is smoother rotations. As it stands, the pitch-
 
 How about a code where you all you do is input the payload mass and desired trajectory and it gives you back the flight profile? That sounds like a good end goal to me. ;)
 
-Also I'll translate this to C++ at some point in time. Object-oriented programming would be much smoother for this kind of project.
+Also I'll translate this to Java at some point in time. Object-oriented programming would be much smoother for this kind of project.
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
